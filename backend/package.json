@@ -4,6 +4,7 @@
   "description": "This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).",
   "main": "index.js",
   "scripts": {
+    "dev": "node -e \"console.log('No backend dev server configured yet. Run from repo root: npm run dev (frontend) or npm run dev:backend once implemented.')\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

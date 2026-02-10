@@ -13,3 +13,111 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+model User {
+  user_id           Int @id @default(autoincrement())
+  name              String
+  surname           String
+  email             String @unique
+  password          String
+  Address           String?
+  telephone         String?
+  // relations
+  orders            Order[]
+  fateResults      FateResult[]
+  admin            Admin?
+}
+
+model Order {
+  order_id          Int   @id @default(autoincrement())
+  user_id           Int  
+  total_price       Float
+  tracking_status   String
+  payment_bill      String?
+  createOrder       DateTime @default(now())
+  // relations
+  user              User     @relation(fields: [user_id], references: [user_id]) 
+  orderItems       OrderItem[] 
+}
+
+model OrderItem {
+  orderItem_id      Int  @id @default(autoincrement())
+  order_id          Int
+  product_id        Int
+  result_id         Int
+  quantity          Int
+  price             Float
+  // relations
+  order             Order   @relation(fields: [order_id], references: [order_id])
+  product           Product @relation(fields: [product_id], references: [product_id])
+}
+
+model Product {
+  product_id        Int  @id @default(autoincrement())
+  product_name      String
+  category          String
+  price             Float
+  main_stat         String?
+  description       String?
+  stock_quantity    Int
+  createdAt        DateTime @default(now())
+  isActive         Boolean  @default(true)
+  // relations
+  orderItems       OrderItem[]
+}
+
+model Witch {
+  witch_id          Int  @id @default(autoincrement())
+  sanctuary_stat    Int
+  purity_stat       Int
+  telluric_stat     Int
+  ethereality_stat  Int
+  omniscience_stat  Int
+  healing_stat      Int
+  wealth_stat       Int
+  abundance_stat    Int
+  intelligence_stat Int
+  creativity_stat   Int
+  affection_stat    Int
+  passion_stat      Int
+  // relations
+  fateResults      FateResult[]
+}
+model Fate {
+  stat_id           Int  @id @default(autoincrement())
+  stat_name         String @unique
+  stone             String
+  result_des1       String
+  result_des2       String
+  result_des3       String
+
+  // relations
+  fateResults      FateResult[]
+
+
+}
+
+model FateResult {
+  result_id         Int  @id @default(autoincrement())
+  user_id           Int
+  witch_id          Int 
+  drawn_stat        String
+  stat_result       String
+  soecial_event     Boolean @default(false)
+  result            String
+  createdAt         DateTime @default(now())
+
+  // relations
+  usser             User   @relation(fields: [user_id], references: [user_id])
+  witch             Witch  @relation(fields: [witch_id], references: [witch_id])
+  fate             Fate   @relation(fields: [stat_result], references: [stat_name])
+}
+
+model Admin {
+  admin_id          Int  @id @default(autoincrement())
+  user_id           Int @unique
+  email             String 
+  password          String
+
+  user              User   @relation(fields: [user_id], references: [user_id])
+}
