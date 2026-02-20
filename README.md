@@ -1,48 +1,142 @@
-# SE-Project-2025
-This is Project for Software Engineering 2/2025
-เป็นเว็บดูดวง + ขายของ
-ที่มา :
-จุดประสงค์ : 
+# 🔮 SE-Project-2025  
+## ระบบดูดวงและจำหน่ายสินค้าออนไลน์  
+รายวิชา Software Engineering 2/2025  
+
+---
+
+# บทนำ (Introduction)
+
+โปรเจคนี้เป็นระบบเว็บแอปพลิเคชันที่พัฒนาเพื่อให้ผู้ใช้งานสามารถ:
+
+- สมัครสมาชิกและเข้าสู่ระบบ
+- ทำการดูดวงและบันทึกผลลัพธ์
+- เลือกซื้อสินค้า
+- ตรวจสอบประวัติคำสั่งซื้อ
+
+ระบบมีการแยกสิทธิ์ผู้ใช้งานเป็น:
+
+- 👤 User  
+- 👮 Admin  
+
+---
+
+# วัตถุประสงค์ของระบบ
+
+- เพื่อออกแบบและพัฒนาระบบ Full-Stack Web Application
+- เพื่อประยุกต์ใช้แนวคิด Software Architecture
+- เพื่อใช้งาน Authentication และ Authorization อย่างถูกต้อง
+- เพื่อใช้ ORM (Prisma) ในการจัดการฐานข้อมูล
+
+---
+
+# สถาปัตยกรรมระบบ (System Architecture)
+
+Frontend (Next.js)
+↓ HTTP
+Backend (Express + Prisma)
+↓
+PostgreSQL Database
 
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+ระบบใช้รูปแบบ:
 
-## Getting Started
+- Client–Server Architecture  
+- Layered Architecture  
+- Service Layer Pattern  
 
-First, run the development server:
+---
+
+# เทคโนโลยีที่ใช้ (Tech Stack)
+
+## Frontend
+- Next.js
+- React
+- TypeScript
+
+## Backend
+- Node.js
+- Express
+- TypeScript
+- Prisma ORM
+- bcrypt (Password Hashing)
+- JSON Web Token (JWT)
+
+## Database
+- PostgreSQL
+
+---
+
+# โครงสร้างโปรเจค (Project Structure)
+SE-PROJECT-2025/
+│
+├── frontend/ # Next.js
+│
+└── backend/
+├── prisma/
+│ ├── schema.prisma
+│ └── migrations/
+│
+├── src/
+│ ├── routes/
+│ ├── services/
+│ ├── middleware/
+│ ├── lib/
+│ └── server.ts
+│
+├── .env
+└── package.json
+
+---
+
+# ขั้นตอนการติดตั้งและรันระบบ
+
+## 🔹 Clone Project
 
 ```bash
+git clone <repository-url>
+cd SE-PROJECT-2025
+🖥 ติดตั้งและรัน Frontend
+cd frontend
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+เปิดใช้งานที่:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-## How to run backend
+http://localhost:3000
+🔧 ติดตั้งและรัน Backend
 cd backend
-npx prisma studio <---- run prisma
+npm install
+🔐 สร้างไฟล์ .env
 
+สร้างไฟล์ .env ในโฟลเดอร์ backend แล้วเพิ่ม:
+
+DATABASE_URL="postgresql://postgres:password@localhost:5432/mydb"
+JWT_SECRET="your_super_secret_key"
+🗄 สร้างฐานข้อมูล
+npx prisma migrate dev
+🗄 เปิดดูฐานข้อมูล (Optional)
+npx prisma studio
+🚀 รัน Backend Server
+npm run dev
+
+Backend จะทำงานที่:
+
+http://localhost:5001
+7️⃣ API Endpoints
+🔐 Authentication
+Register
+POST /api/auth/register
+Login
+POST /api/auth/login
+👤 User
+Get Profile (Protected)
+GET /api/user/profile
+
+Header ที่ต้องส่ง:
+
+Authorization: Bearer <token>
+ระบบ Authentication
+ใช้ bcrypt ในการ hash password
+ใช้ JWT สำหรับ authentication
+ใช้ middleware ตรวจสอบ token
+ตรวจสอบสิทธิ์ Admin ผ่าน role-based validation
