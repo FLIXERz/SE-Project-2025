@@ -5,8 +5,7 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client"
-  output   = "../../frontend/node_modules/.prisma/client"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -20,7 +19,7 @@ model User {
   surname           String
   email             String @unique
   password          String
-  Address           String?
+  address           String?
   telephone         String?
   // relations
   orders            Order[]
@@ -103,21 +102,18 @@ model FateResult {
   witch_id          Int 
   drawn_stat        String
   stat_result       String
-  soecial_event     Boolean @default(false)
+  special_event     Boolean @default(false)
   result            String
   createdAt         DateTime @default(now())
 
   // relations
-  usser             User   @relation(fields: [user_id], references: [user_id])
+  user             User   @relation(fields: [user_id], references: [user_id])
   witch             Witch  @relation(fields: [witch_id], references: [witch_id])
   fate             Fate   @relation(fields: [stat_result], references: [stat_name])
 }
 
 model Admin {
-  admin_id          Int  @id @default(autoincrement())
-  user_id           Int @unique
-  email             String 
-  password          String
-
-  user              User   @relation(fields: [user_id], references: [user_id])
+  admin_id Int @id @default(autoincrement())
+  user_id  Int @unique
+  user     User @relation(fields: [user_id], references: [user_id])
 }
