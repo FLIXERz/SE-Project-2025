@@ -56,7 +56,7 @@ model Product {
   product_name      String
   category          String
   price             Float
-  main_stat         String?
+  main_stat         String[]
   description       String?
   stock_quantity    Int
   createdAt        DateTime @default(now())
