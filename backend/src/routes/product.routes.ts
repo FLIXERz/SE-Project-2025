@@ -1,6 +1,7 @@
 import { Router } from "express"
 import { authenticate, requireAdmin } from "../middleware/auth.middleware"
 import { prisma } from "../lib/prisma"
+import { allowedStats, StatType } from "../constants/stats"
 
 const router = Router()
 
@@ -73,4 +74,55 @@ router.delete("/:id", authenticate, requireAdmin, async (req, res) => {
   }
 })
 
+// add product with main_stat validation (admin only)
+router.post("/", authenticate, requireAdmin, async (req, res) => {
+  try {
+    const {
+      product_name,
+      category,
+      price,
+      stock_quantity,
+      description,
+      main_stat
+    } = req.body
+
+    // validate main_stat
+    if (main_stat && !Array.isArray(main_stat)) {
+      return res.status(400).json({
+        error: "main_stat must be an array"
+      })
+    }
+
+    // validate each stat in main_stat
+    if (main_stat) {
+  const invalidStat = (main_stat as string[]).find(
+    (stat) => !allowedStats.includes(stat as StatType)
+  )
+
+  if (invalidStat) {
+    return res.status(400).json({
+      error: `Invalid stat: ${invalidStat}`
+    })
+  }
+}
+    // create product
+    const product = await prisma.product.create({
+      data: {
+        product_name,
+        category,
+        price: Number(price),
+        stock_quantity: Number(stock_quantity),
+        description,
+        main_stat
+      }
+    })
+
+    res.status(201).json(product)
+  } catch (error) {
+    res.status(400).json({ error: "Cannot create product" })
+  }
+})
+
 export default router
+
+
