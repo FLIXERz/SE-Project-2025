@@ -5,11 +5,13 @@ import { allowedOrderStatus } from "../constants/orderStatus"
 
 const router = Router()
 
-//Admin: Get All Orders
+/* =======================================================
+  Admin - Get All Orders
+======================================================= */
 router.get("/", authenticate, requireAdmin, async (req, res) => {
   try {
     const orders = await prisma.order.findMany({
-      orderBy: { createOrder: "desc" }, // หรือ createdAt ถ้าใช้ชื่อนั้น
+      orderBy: { createOrder: "desc" },
       include: {
         user: {
           select: {
@@ -42,44 +44,46 @@ router.get("/", authenticate, requireAdmin, async (req, res) => {
   }
 })
 
-//Admin: Update Order Status
-router.post("/:id/status", authenticate, requireAdmin, async (req, res) => {
+
+/* =======================================================
+  User - My Orders  (ต้องมาก่อน /:id)
+======================================================= */
+router.get("/my", authenticate, async (req: any, res) => {
   try {
-    const orderId = Number(req.params.id)
-    const { status } = req.body
+    const userId = req.user.user_id
 
-    if (!status) {
-      return res.status(400).json({ error: "Status is required" })
-    }
-
-    if (!allowedOrderStatus.includes(status)) {
-      return res.status(400).json({
-        error: `Invalid status. Allowed: ${allowedOrderStatus.join(", ")}`
-      })
-    }
-
-    const order = await prisma.order.update({
-      where: { order_id: orderId },
-      data: {
-        order_status: {
-          push: status
+    const orders = await prisma.order.findMany({
+      where: { user_id: userId },
+      include: {
+        orderItems: {
+          include: {
+            product: true
+          }
         }
+      },
+      orderBy: {
+        createOrder: "desc"
       }
     })
 
-    res.json({
-      message: "Order status updated",
-      order_status: order.order_status
-    })
+    const formattedOrders = orders.map(order => ({
+      ...order,
+      latestOrderStatus:
+        order.order_status[order.order_status.length - 1]
+    }))
+
+    res.json(formattedOrders)
 
   } catch (error) {
-    console.error("UPDATE ORDER STATUS ERROR:", error)
-    res.status(500).json({ error: "Cannot update status" })
+    console.error("USER ORDER HISTORY ERROR:", error)
+    res.status(500).json({ error: "Cannot fetch orders" })
   }
 })
 
 
-// 📦 Order Detail
+/* =======================================================
+  Order Detail
+======================================================= */
 router.get("/:id", authenticate, async (req: any, res) => {
   try {
     const orderId = Number(req.params.id)
@@ -110,7 +114,6 @@ router.get("/:id", authenticate, async (req: any, res) => {
       return res.status(404).json({ error: "Order not found" })
     }
 
-    // Only allow access if user is admin or owner of the order
     if (!isAdmin && order.user_id !== userId) {
       return res.status(403).json({ error: "Access denied" })
     }
@@ -124,9 +127,15 @@ router.get("/:id", authenticate, async (req: any, res) => {
     })
 
   } catch (error) {
+    console.error("ORDER DETAIL ERROR:", error)
     res.status(500).json({ error: "Cannot fetch order" })
   }
 })
+
+
+/* =======================================================
+  Create Order
+======================================================= */
 
 type OrderItemInput = {
   product_id: number
@@ -134,10 +143,8 @@ type OrderItemInput = {
   price: number
 }
 
-// Create Order
 router.post("/", authenticate, async (req: any, res) => {
   try {
-    
     const userId = req.user.user_id
     const { items } = req.body
 
@@ -207,13 +214,16 @@ router.post("/", authenticate, async (req: any, res) => {
 
     res.status(201).json(order)
 
-    } catch (error) {
-  console.error("ORDER ERROR:", error)
-  res.status(500).json({ error: "Order failed" })
-    }
+  } catch (error) {
+    console.error("ORDER ERROR:", error)
+    res.status(500).json({ error: "Order failed" })
+  }
 })
 
-// Admin: Update Order Status with Workflow Validation
+
+/* =======================================================
+  Admin - Update Order Status (Workflow Guard)
+======================================================= */
 router.post("/:id/status", authenticate, requireAdmin, async (req, res) => {
   try {
     const orderId = Number(req.params.id)
@@ -240,27 +250,23 @@ router.post("/:id/status", authenticate, requireAdmin, async (req, res) => {
     const currentStatus =
       order.order_status[order.order_status.length - 1]
 
-    // 🔥 Workflow Definition
     const workflow = ["paid", "preparing", "shipping", "completed"]
 
     const currentIndex = workflow.indexOf(currentStatus)
     const nextIndex = workflow.indexOf(status)
 
-    // if order is already completed, no further updates allowed
     if (currentStatus === "completed") {
       return res.status(400).json({
         error: "Order already completed. Cannot update."
       })
     }
 
-    // cannot move backwards or repeat same status
     if (nextIndex <= currentIndex) {
       return res.status(400).json({
         error: `Cannot move from ${currentStatus} to ${status}`
       })
     }
 
-    // must follow defined workflow steps
     if (nextIndex !== currentIndex + 1) {
       return res.status(400).json({
         error: `Invalid workflow transition from ${currentStatus} to ${status}`

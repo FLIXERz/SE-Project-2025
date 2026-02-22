@@ -21,92 +21,89 @@ router.post("/:id/tracking", authenticate, requireAdmin, async (req, res) => {
       })
     }
 
-    const orderItem = await prisma.orderItem.update({
-      where: { orderItem_id: orderItemId },
-      data: {
-        tracking_status: {
-          push: status
+    const updatedItem = await prisma.$transaction(async (tx) => {
+
+      const orderItem = await tx.orderItem.findUnique({
+        where: { orderItem_id: orderItemId }
+      })
+
+      if (!orderItem) {
+        throw new Error("Order item not found")
+      }
+
+      const currentStatus =
+        orderItem.tracking_status[orderItem.tracking_status.length - 1]
+
+      const workflow = [
+        "order_received",
+        "preparing",
+        "packed",
+        "shipping",
+        "delivered"
+      ]
+
+      const currentIndex = workflow.indexOf(currentStatus)
+      const nextIndex = workflow.indexOf(status)
+
+      if (currentStatus === "delivered") {
+        throw new Error("Tracking already completed.")
+      }
+
+      if (nextIndex <= currentIndex) {
+        throw new Error(`Cannot move from ${currentStatus} to ${status}`)
+      }
+
+      if (nextIndex !== currentIndex + 1) {
+        throw new Error(
+          `Invalid tracking transition from ${currentStatus} to ${status}`
+        )
+      }
+
+      //Update tracking
+      const updated = await tx.orderItem.update({
+        where: { orderItem_id: orderItemId },
+        data: {
+          tracking_status: {
+            push: status
+          }
+        }
+      })
+
+      //Auto complete order if all delivered
+      if (status === "delivered") {
+
+        const allItems = await tx.orderItem.findMany({
+          where: { order_id: updated.order_id }
+        })
+
+        const allDelivered = allItems.every(item => {
+          const last =
+            item.tracking_status[item.tracking_status.length - 1]
+          return last === "delivered"
+        })
+
+        if (allDelivered) {
+          const order = await tx.order.findUnique({
+            where: { order_id: updated.order_id }
+          })
+
+          const currentOrderStatus =
+            order?.order_status[order.order_status.length - 1]
+
+          if (currentOrderStatus !== "completed") {
+            await tx.order.update({
+              where: { order_id: updated.order_id },
+              data: {
+                order_status: {
+                  push: "completed"
+                }
+              }
+            })
+          }
         }
       }
-    })
 
-    res.json({
-      message: "Tracking status updated",
-      tracking_status: orderItem.tracking_status
-    })
-
-  } catch (error) {
-    console.error("UPDATE TRACKING ERROR:", error)
-    res.status(500).json({ error: "Cannot update tracking" })
-  }
-})
-
-router.post("/:id/tracking", authenticate, requireAdmin, async (req, res) => {
-  try {
-    const orderItemId = Number(req.params.id)
-    const { status } = req.body
-
-    if (!status) {
-      return res.status(400).json({ error: "Status is required" })
-    }
-
-    if (!allowedTrackingStatus.includes(status)) {
-      return res.status(400).json({
-        error: `Invalid tracking status. Allowed: ${allowedTrackingStatus.join(", ")}`
-      })
-    }
-
-    const orderItem = await prisma.orderItem.findUnique({
-      where: { orderItem_id: orderItemId }
-    })
-
-    if (!orderItem) {
-      return res.status(404).json({ error: "Order item not found" })
-    }
-
-    const currentStatus =
-      orderItem.tracking_status[orderItem.tracking_status.length - 1]
-
-    //Tracking Workflow Definition
-    const workflow = [
-      "order_received",
-      "preparing",
-      "packed",
-      "shipping",
-      "delivered"
-    ]
-
-    const currentIndex = workflow.indexOf(currentStatus)
-    const nextIndex = workflow.indexOf(status)
-
-    // if order is already delivered, no further updates allowed
-    if (currentStatus === "delivered") {
-      return res.status(400).json({
-        error: "Tracking already completed."
-      })
-    }
-
-    // cannot move backwards or repeat same status
-    if (nextIndex <= currentIndex) {
-      return res.status(400).json({
-        error: `Cannot move from ${currentStatus} to ${status}`
-      })
-    }
-
-    // enforce sequential updates
-    if (nextIndex !== currentIndex + 1) {
-      return res.status(400).json({
-        error: `Invalid tracking transition from ${currentStatus} to ${status}`
-      })
-    }
-
-    const updatedItem = await prisma.orderItem.update({
-      where: { orderItem_id: orderItemId },
-      data: {
-        tracking_status: {
-          push: status
-        }
-      }
+      return updated
     })
 
     res.json({
@@ -114,10 +111,9 @@ router.post("/:id/tracking", authenticate, requireAdmin, async (req, res) => {
       tracking_status: updatedItem.tracking_status
     })
 
-  } catch (error) {
-    console.error("UPDATE TRACKING ERROR:", error)
-    res.status(500).json({ error: "Cannot update tracking" })
+  } catch (error: any) {
+    console.error("UPDATE TRACKING ERROR:", error.message)
+    res.status(400).json({ error: error.message })
   }
 })
-
 export default router
