@@ -5,49 +5,89 @@ import { allowedStats, StatType } from "../constants/stats"
 
 const router = Router()
 
-// Get Products with Filters
+//Get Products with Filters + Pagination + Sorting
 router.get("/", async (req, res) => {
   try {
-    const { category, stat, min, max, active } = req.query
+    const {
+      category,
+      stat,
+      min,
+      max,
+      active,
+      page = "1",
+      limit = "10",
+      sort = "newest"
+    } = req.query
 
     const where: any = {}
 
-    // Default: show only active products
+    // Default active
     if (active === undefined) {
       where.isActive = true
     } else {
       where.isActive = active === "true"
     }
 
-    // Filter by category
     if (category) {
       where.category = category
     }
 
-    // Filter by main_stat (array contains)
     if (stat) {
       where.main_stat = {
         has: stat
       }
     }
 
-    // Filter by price range
     if (min || max) {
       where.price = {}
-
       if (min) where.price.gte = Number(min)
       if (max) where.price.lte = Number(max)
     }
 
+    // Pagination protection
+    let pageNumber = Number(page)
+    let limitNumber = Number(limit)
+
+    if (pageNumber < 1) pageNumber = 1
+    if (limitNumber < 1) limitNumber = 10
+    if (limitNumber > 100) limitNumber = 100
+
+    const skip = (pageNumber - 1) * limitNumber
+
+    // Sorting logic
+    let orderBy: any = { createdAt: "desc" }
+
+    if (sort === "price_asc") {
+      orderBy = { price: "asc" }
+    } else if (sort === "price_desc") {
+      orderBy = { price: "desc" }
+    } else if (sort === "oldest") {
+      orderBy = { createdAt: "asc" }
+    } else if (sort === "newest") {
+      orderBy = { createdAt: "desc" }
+    }
+
+    const total = await prisma.product.count({ where })
+
     const products = await prisma.product.findMany({
       where,
-      orderBy: { createdAt: "desc" }
+      skip,
+      take: limitNumber,
+      orderBy
     })
 
-    res.json(products)
+    res.json({
+      data: products,
+      pagination: {
+        total,
+        page: pageNumber,
+        limit: limitNumber,
+        totalPages: Math.ceil(total / limitNumber)
+      }
+    })
 
   } catch (error) {
-    console.error("PRODUCT FILTER ERROR:", error)
+    console.error("PRODUCT PAGINATION ERROR:", error)
     res.status(500).json({ error: "Cannot fetch products" })
   }
 })
