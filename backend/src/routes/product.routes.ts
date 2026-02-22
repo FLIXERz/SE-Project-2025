@@ -5,12 +5,51 @@ import { allowedStats, StatType } from "../constants/stats"
 
 const router = Router()
 
-// Get all active products
+// Get Products with Filters
 router.get("/", async (req, res) => {
-  const products = await prisma.product.findMany({
-    where: { isActive: true }
-  })
-  res.json(products)
+  try {
+    const { category, stat, min, max, active } = req.query
+
+    const where: any = {}
+
+    // Default: show only active products
+    if (active === undefined) {
+      where.isActive = true
+    } else {
+      where.isActive = active === "true"
+    }
+
+    // Filter by category
+    if (category) {
+      where.category = category
+    }
+
+    // Filter by main_stat (array contains)
+    if (stat) {
+      where.main_stat = {
+        has: stat
+      }
+    }
+
+    // Filter by price range
+    if (min || max) {
+      where.price = {}
+
+      if (min) where.price.gte = Number(min)
+      if (max) where.price.lte = Number(max)
+    }
+
+    const products = await prisma.product.findMany({
+      where,
+      orderBy: { createdAt: "desc" }
+    })
+
+    res.json(products)
+
+  } catch (error) {
+    console.error("PRODUCT FILTER ERROR:", error)
+    res.status(500).json({ error: "Cannot fetch products" })
+  }
 })
 
 // add product (admin only)
