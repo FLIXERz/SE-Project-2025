@@ -134,7 +134,7 @@ type OrderItemInput = {
   price: number
 }
 
-// 🛒 Create Order
+// Create Order
 router.post("/", authenticate, async (req: any, res) => {
   try {
     
@@ -213,5 +213,78 @@ router.post("/", authenticate, async (req: any, res) => {
     }
 })
 
+// Admin: Update Order Status with Workflow Validation
+router.post("/:id/status", authenticate, requireAdmin, async (req, res) => {
+  try {
+    const orderId = Number(req.params.id)
+    const { status } = req.body
+
+    if (!status) {
+      return res.status(400).json({ error: "Status is required" })
+    }
+
+    if (!allowedOrderStatus.includes(status)) {
+      return res.status(400).json({
+        error: `Invalid status. Allowed: ${allowedOrderStatus.join(", ")}`
+      })
+    }
+
+    const order = await prisma.order.findUnique({
+      where: { order_id: orderId }
+    })
+
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" })
+    }
+
+    const currentStatus =
+      order.order_status[order.order_status.length - 1]
+
+    // 🔥 Workflow Definition
+    const workflow = ["paid", "preparing", "shipping", "completed"]
+
+    const currentIndex = workflow.indexOf(currentStatus)
+    const nextIndex = workflow.indexOf(status)
+
+    // if order is already completed, no further updates allowed
+    if (currentStatus === "completed") {
+      return res.status(400).json({
+        error: "Order already completed. Cannot update."
+      })
+    }
+
+    // cannot move backwards or repeat same status
+    if (nextIndex <= currentIndex) {
+      return res.status(400).json({
+        error: `Cannot move from ${currentStatus} to ${status}`
+      })
+    }
+
+    // must follow defined workflow steps
+    if (nextIndex !== currentIndex + 1) {
+      return res.status(400).json({
+        error: `Invalid workflow transition from ${currentStatus} to ${status}`
+      })
+    }
+
+    const updatedOrder = await prisma.order.update({
+      where: { order_id: orderId },
+      data: {
+        order_status: {
+          push: status
+        }
+      }
+    })
+
+    res.json({
+      message: "Order status updated",
+      order_status: updatedOrder.order_status
+    })
+
+  } catch (error) {
+    console.error("UPDATE ORDER STATUS ERROR:", error)
+    res.status(500).json({ error: "Cannot update status" })
+  }
+})
 
 export default router
