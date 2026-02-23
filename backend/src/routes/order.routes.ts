@@ -2,8 +2,38 @@ import { Router } from "express"
 import { prisma } from "../lib/prisma"
 import { authenticate, requireAdmin } from "../middleware/auth.middleware"
 import { allowedOrderStatus } from "../constants/orderStatus"
-
+import multer from "multer"
+import path from "path"
+// Order routes for both users and admins
 const router = Router()
+
+// Multer setup for slip uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/slips")
+  },
+  filename: (req, file, cb) => {
+    const uniqueName =
+      Date.now() + "-" + Math.round(Math.random() * 1e9)
+    cb(null, uniqueName + path.extname(file.originalname))
+  }
+})
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (req, file, cb) => {
+    if (
+      file.mimetype === "image/jpeg" ||
+      file.mimetype === "image/png"
+    ) {
+      cb(null, true)
+    } else {
+      cb(new Error("Only JPG and PNG allowed"))
+    }
+  }
+})
+
 
 /* =======================================================
   Admin - Get All Orders
@@ -292,6 +322,64 @@ router.post("/:id/cancel", authenticate, async (req: any, res) => {
 })
 
 /* =======================================================
+  User - Upload Payment Slip
+======================================================= */
+router.post(
+  "/:id/payment",
+  authenticate,
+  upload.single("slip"),
+  async (req: any, res) => {
+    try {
+      const orderId = Number(req.params.id)
+      const userId = req.user.user_id
+
+      if (!req.file) {
+        return res.status(400).json({
+          error: "Slip image is required"
+        })
+      }
+
+      const order = await prisma.order.findUnique({
+        where: { order_id: orderId }
+      })
+
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" })
+      }
+
+      if (order.user_id !== userId) {
+        return res.status(403).json({ error: "Access denied" })
+      }
+
+      const currentStatus =
+        order.order_status[order.order_status.length - 1]
+
+      if (currentStatus !== "paid") {
+        return res.status(400).json({
+          error: "Cannot upload slip for this status"
+        })
+      }
+
+      const imagePath = `/uploads/slips/${req.file.filename}`
+
+      const updatedOrder = await prisma.order.update({
+        where: { order_id: orderId },
+        data: { payment_bill: imagePath }
+      })
+
+      res.json({
+        message: "Slip uploaded successfully",
+        payment_bill: updatedOrder.payment_bill
+      })
+
+    } catch (error: any) {
+      console.error("SLIP UPLOAD ERROR:", error.message)
+      res.status(500).json({ error: "Upload failed" })
+    }
+  }
+)
+
+/* =======================================================
   Admin - Update Order Status (Workflow Guard)
 ======================================================= */
 router.post("/:id/status", authenticate, requireAdmin, async (req, res) => {
@@ -362,5 +450,6 @@ router.post("/:id/status", authenticate, requireAdmin, async (req, res) => {
     res.status(500).json({ error: "Cannot update status" })
   }
 })
+
 
 export default router
